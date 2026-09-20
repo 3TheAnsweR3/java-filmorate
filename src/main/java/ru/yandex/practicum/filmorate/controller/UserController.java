@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,22 +54,14 @@ public class UserController {
     }
 
     private void validateUser(User user) {
-        if (user.getEmail() == null || user.getEmail().isBlank() || !user.getEmail().contains("@")) {
-            log.warn("Ошибка валидации пользователя: некорректный email");
-            throw new ValidationException("Email пользователя не должен быть пустым и должен содержать @!");
-        }
-        if (user.getLogin() == null || user.getLogin().isBlank() || user.getLogin().contains(" ")) {
-            log.warn("Ошибка валидации пользователя: некорректный логин");
-            throw new ValidationException("Логин пользователя не должен быть пустым и содержать пробелов!");
+        if (user.getLogin().contains(" ")) {
+            log.warn("Ошибка валидации пользователя: логин содержит пробелы");
+            throw new ValidationException(
+                    "Логин пользователя не должен содержать пробелов!");
         }
         if (user.getName() == null || user.getName().isBlank()) {
             log.debug("Пользователь оставил имя пустым");
             user.setName(user.getLogin());
-        }
-        if (user.getBirthday() == null || user.getBirthday().isAfter(LocalDate.now())) {
-            log.warn("Ошибка валидации пользователя: некорректная дата рождения {}",
-                    user.getBirthday());
-            throw new ValidationException("День рождения пользователя не должен быть позднее настоящей даты!");
         }
     }
 }

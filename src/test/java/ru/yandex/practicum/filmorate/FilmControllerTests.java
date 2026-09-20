@@ -9,9 +9,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import ru.yandex.practicum.filmorate.controller.FilmController;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 import java.time.LocalDate;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -19,31 +23,32 @@ class FilmControllerTests {
 
     private FilmController filmController;
 
+    private final Validator validator =
+            Validation.buildDefaultValidatorFactory().getValidator();
+
     @BeforeEach
     void createFilmController() {
         filmController = new FilmController();
     }
 
     @ParameterizedTest
-    @DisplayName("Должно выбрасываться исключение при пустом или состоящем из пробелов названии фильма")
+    @DisplayName("Аннотационная валидация должна отклонять некорректное название фильма")
     @NullAndEmptySource
     @ValueSource(strings = "     ")
-    void shouldThrowExceptionForInvalidName(String name) {
+    void shouldDetectInvalidName(String name) {
         Film film = createValidFilm();
         film.setName(name);
 
-        assertThrows(ValidationException.class,
-                () -> filmController.createNewFilm(film));
+        assertFalse(validator.validate(film).isEmpty());
     }
 
     @Test
     @DisplayName("Должно выбрасываться исключение, если описание фильма длиннее 200 символов")
-    void shouldThrowExceptionForInvalidDescription() {
+    void shouldDetectInvalidDescription() {
         Film film = createValidFilm();
         film.setDescription("a".repeat(201));
 
-        assertThrows(ValidationException.class,
-                () -> filmController.createNewFilm(film));
+        assertFalse(validator.validate(film).isEmpty());
     }
 
     @ParameterizedTest
@@ -53,7 +58,7 @@ class FilmControllerTests {
         Film film = createValidFilm();
         film.setDescription("a".repeat(descriptionLength));
 
-        assertDoesNotThrow(() -> filmController.createNewFilm(film));
+        assertTrue(validator.validate(film).isEmpty());
     }
 
     @Test
@@ -79,12 +84,11 @@ class FilmControllerTests {
     @ParameterizedTest
     @DisplayName("Должно выбрасываться исключение, если продолжительность фильма меньше или равна нулю")
     @ValueSource(ints = {-1, 0})
-    void shouldThrowExceptionForInvalidDuration(int duration) {
+    void shouldDetectInvalidDuration(int duration) {
         Film film = createValidFilm();
         film.setDuration(duration);
 
-        assertThrows(ValidationException.class,
-                () -> filmController.createNewFilm(film));
+        assertFalse(validator.validate(film).isEmpty());
     }
 
     @Test

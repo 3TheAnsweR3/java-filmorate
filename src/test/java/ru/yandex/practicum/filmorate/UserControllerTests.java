@@ -9,9 +9,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import ru.yandex.practicum.filmorate.controller.UserController;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 import java.time.LocalDate;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -19,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UserControllerTests {
 
     private UserController userController;
+
+    private final Validator validator =
+            Validation.buildDefaultValidatorFactory().getValidator();
 
     @BeforeEach
     void createUserController() {
@@ -29,11 +36,11 @@ class UserControllerTests {
     @DisplayName("Должно выбрасываться исключение при некорректном email")
     @NullAndEmptySource
     @ValueSource(strings = {"   ", "ivan#xmail.com", "ivanxmail.com"})
-    void shouldThrowExceptionForInvalidEmail(String email) {
+    void shouldDetectInvalidEmail(String email) {
         User user = createValidUser();
         user.setEmail(email);
 
-        assertThrows(ValidationException.class, () -> userController.createUser(user));
+        assertFalse(validator.validate(user).isEmpty());
     }
 
     @Test
@@ -46,14 +53,24 @@ class UserControllerTests {
     }
 
     @ParameterizedTest
-    @DisplayName("Должно выбрасываться исключение при некорректном логине")
+    @DisplayName("Аннотационная валидация должна отклонять пустой логин")
     @NullAndEmptySource
-    @ValueSource(strings = {"i van", "   "})
-    void shouldThrowExceptionForInvalidLogin(String login) {
+    @ValueSource(strings = "   ")
+    void shouldDetectBlankLogin(String login) {
         User user = createValidUser();
         user.setLogin(login);
 
-        assertThrows(ValidationException.class, () -> userController.createUser(user));
+        assertFalse(validator.validate(user).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Должно выбрасываться исключение, если логин содержит пробел")
+    void shouldThrowExceptionForLoginWithSpaces() {
+        User user = createValidUser();
+        user.setLogin("i van");
+
+        assertThrows(ValidationException.class,
+                () -> userController.createUser(user));
     }
 
     @ParameterizedTest
@@ -76,7 +93,7 @@ class UserControllerTests {
         User user = createValidUser();
         user.setBirthday(LocalDate.now().plusDays(dayOffset));
 
-        assertDoesNotThrow(() -> userController.createUser(user));
+        assertTrue(validator.validate(user).isEmpty());
     }
 
     @Test
@@ -85,7 +102,7 @@ class UserControllerTests {
         User user = createValidUser();
         user.setBirthday(LocalDate.now().plusDays(1));
 
-        assertThrows(ValidationException.class, () -> userController.createUser(user));
+        assertFalse(validator.validate(user).isEmpty());
     }
 
     private User createValidUser() {
