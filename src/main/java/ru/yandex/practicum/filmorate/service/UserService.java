@@ -47,6 +47,11 @@ public class UserService {
     }
 
     public void addFriend(long userId, long friendId) {
+        if (userId == friendId) {
+            throw new ValidationException(
+                    "Пользователь не может добавить себя в друзья");
+        }
+
         User user = userStorage.getUser(userId);
         User friend = userStorage.getUser(friendId);
 

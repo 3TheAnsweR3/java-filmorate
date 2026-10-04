@@ -3,6 +3,7 @@ package ru.yandex.practicum.filmorate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FilmorateBusinessLogicTests {
@@ -43,6 +45,16 @@ class FilmorateBusinessLogicTests {
         assertEquals(1, second.getFriends().size());
         assertTrue(first.getFriends().contains(second.getId()));
         assertTrue(second.getFriends().contains(first.getId()));
+    }
+
+    @Test
+    @DisplayName("Пользователь не должен добавлять себя в друзья")
+    void shouldNotAddUserAsOwnFriend() {
+        User user = userService.createUser(createUser("user"));
+
+        assertThrows(ValidationException.class,
+                () -> userService.addFriend(user.getId(), user.getId()));
+        assertTrue(user.getFriends().isEmpty());
     }
 
     @Test
