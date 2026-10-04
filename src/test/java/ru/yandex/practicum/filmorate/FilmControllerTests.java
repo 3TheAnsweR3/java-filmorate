@@ -9,6 +9,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import ru.yandex.practicum.filmorate.controller.FilmController;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.service.FilmService;
+import ru.yandex.practicum.filmorate.storage.InMemoryFilmStorage;
+import ru.yandex.practicum.filmorate.storage.InMemoryUserStorage;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
@@ -28,7 +31,10 @@ class FilmControllerTests {
 
     @BeforeEach
     void createFilmController() {
-        filmController = new FilmController();
+        FilmService filmService = new FilmService(
+                new InMemoryFilmStorage(),
+                new InMemoryUserStorage());
+        filmController = new FilmController(filmService);
     }
 
     @ParameterizedTest

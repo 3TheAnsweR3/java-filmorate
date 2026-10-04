@@ -9,6 +9,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import ru.yandex.practicum.filmorate.controller.UserController;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.InMemoryUserStorage;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
@@ -29,7 +31,8 @@ class UserControllerTests {
 
     @BeforeEach
     void createUserController() {
-        userController = new UserController();
+        UserService userService = new UserService(new InMemoryUserStorage());
+        userController = new UserController(userService);
     }
 
     @ParameterizedTest
