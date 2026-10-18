@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.FriendshipStatus;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
@@ -33,18 +34,67 @@ class FilmorateBusinessLogicTests {
     }
 
     @Test
-    @DisplayName("Добавление в друзья должно быть взаимным и не создавать дубликаты")
-    void shouldAddFriendSymmetricallyWithoutDuplicates() {
+    @DisplayName("Первый запрос дружбы должен быть односторонним и без дубликатов")
+    void shouldCreateFriendRequestWithoutDuplicates() {
         User first = userService.createUser(createUser("first"));
         User second = userService.createUser(createUser("second"));
 
         userService.addFriend(first.getId(), second.getId());
         userService.addFriend(first.getId(), second.getId());
 
+        assertEquals(List.of(second), userService.getFriends(first.getId()));
+        assertTrue(userService.getFriends(second.getId()).isEmpty());
+        assertEquals(FriendshipStatus.UNCONFIRMED,
+                first.getFriends().get(second.getId()));
+    }
+
+    @Test
+    @DisplayName("Встречный запрос должен подтверждать дружбу у обоих пользователей")
+    void shouldConfirmFriendshipAfterReverseRequest() {
+        User first = userService.createUser(createUser("first"));
+        User second = userService.createUser(createUser("second"));
+
+        userService.addFriend(first.getId(), second.getId());
+        userService.addFriend(second.getId(), first.getId());
+        userService.addFriend(first.getId(), second.getId());
+
+        assertEquals(FriendshipStatus.CONFIRMED,
+                first.getFriends().get(second.getId()));
+        assertEquals(FriendshipStatus.CONFIRMED,
+                second.getFriends().get(first.getId()));
         assertEquals(1, first.getFriends().size());
         assertEquals(1, second.getFriends().size());
-        assertTrue(first.getFriends().contains(second.getId()));
-        assertTrue(second.getFriends().contains(first.getId()));
+    }
+
+    @Test
+    @DisplayName("Удаление дружбы должно сохранять встречную заявку неподтверждённой")
+    void shouldKeepReverseRequestWhenRemovingFriend() {
+        User first = userService.createUser(createUser("first"));
+        User second = userService.createUser(createUser("second"));
+        userService.addFriend(first.getId(), second.getId());
+        userService.addFriend(second.getId(), first.getId());
+
+        userService.removeFriend(first.getId(), second.getId());
+        userService.removeFriend(first.getId(), second.getId());
+
+        assertTrue(first.getFriends().isEmpty());
+        assertEquals(FriendshipStatus.UNCONFIRMED,
+                second.getFriends().get(first.getId()));
+    }
+
+    @Test
+    @DisplayName("Обновление пользователя должно сохранять статусы дружбы")
+    void shouldPreserveFriendshipStatusWhenUpdatingUser() {
+        User first = userService.createUser(createUser("first"));
+        User second = userService.createUser(createUser("second"));
+        userService.addFriend(first.getId(), second.getId());
+        User updatedUser = createUser("updated");
+        updatedUser.setId(first.getId());
+
+        User result = userService.updateUser(updatedUser);
+
+        assertEquals(FriendshipStatus.UNCONFIRMED,
+                result.getFriends().get(second.getId()));
     }
 
     @Test

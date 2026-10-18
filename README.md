@@ -1,77 +1,86 @@
 # Filmorate
 
-Filmorate is an educational Spring Boot REST API for managing films and users. The project was completed as part of the Yandex Practicum Java Developer programme and focuses on HTTP endpoints, validation, in-memory storage, logging, and automated testing.
+## Схема базы данных
 
-> Educational project. It represents coursework rather than commercial development experience.
+![ER-диаграмма Filmorate](database/filmorate.png)
 
-## Features
+`users` хранит пользователей, `films` — фильмы. Справочники `ratings` и `genres`
+содержат возрастные рейтинги MPA и жанры. Таблица `film_genres` связывает фильмы
+с жанрами, `likes` хранит лайки, а `friendships` — связи между пользователями.
+У фильма может быть несколько жанров и один возрастной рейтинг;
+пока рейтинг не указан, `films.rating_id` может быть `NULL`.
 
-- Create, list, and update films through `/films`.
-- Create, list, and update users through `/users`.
-- Assign sequential identifiers and keep data in memory.
-- Validate request bodies with Jakarta Validation.
-- Apply project-specific rules for release dates, logins, and missing user names.
-- Log successful operations and validation failures.
+Каждая ячейка содержит одно значение. Названия жанров и рейтингов хранятся
+в справочниках и не дублируются в фильмах. Составные первичные ключи в таблицах
+связей не позволяют повторно добавить ту же пару идентификаторов.
 
-## API
+Дружба направленная: первая заявка создаёт строку `(user_id, friend_id)` со статусом
+`UNCONFIRMED`. При встречном добавлении появляются две строки со статусом `CONFIRMED`.
+При удалении своей связи встречная, если она есть, становится неподтверждённой.
+Запросы друзей и общих друзей ниже учитывают все исходящие связи.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/films` | Create a film |
-| `GET` | `/films` | List all films |
-| `PUT` | `/films` | Update an existing film |
-| `POST` | `/users` | Create a user |
-| `GET` | `/users` | List all users |
-| `PUT` | `/users` | Update an existing user |
+### Примеры запросов
 
-## Validation rules
+Числа `1`, `2` и `10` ниже — примеры идентификаторов и размера выборки.
 
-Films require a non-blank name, a description of no more than 200 characters, a release date on or after 28 December 1895, and a positive duration.
+Все фильмы с возрастным рейтингом:
 
-Users require a valid email, a non-blank login without spaces, and a birthday that is not in the future. When the name is missing, the login is used as the display name.
-
-## Technology
-
-- Java 21
-- Spring Boot 3
-- Spring Web
-- Jakarta Validation
-- Lombok
-- JUnit 5
-- Maven
-- GitHub Actions
-
-## Run locally
-
-Requirements: JDK 21 and Maven.
-
-```bash
-mvn spring-boot:run
+```sql
+SELECT f.id, f.name, f.description, f.release_date, f.duration,
+       r.name AS rating
+FROM films AS f
+LEFT JOIN ratings AS r ON r.id = f.rating_id
+ORDER BY f.id;
 ```
 
-The application starts on `http://localhost:8080`.
+Жанры фильма с ID 1:
 
-Example request:
-
-```bash
-curl -X POST http://localhost:8080/films \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "Arrival",
-    "description": "Science-fiction drama",
-    "releaseDate": "2016-11-11",
-    "duration": 116
-  }'
+```sql
+SELECT g.id, g.name
+FROM genres AS g
+JOIN film_genres AS fg ON fg.genre_id = g.id
+WHERE fg.film_id = 1
+ORDER BY g.id;
 ```
 
-## Tests
+Все пользователи:
 
-```bash
-mvn test
+```sql
+SELECT id, email, login, name, birthday
+FROM users
+ORDER BY id;
 ```
 
-The test suite covers controller behaviour, request validation, update scenarios, and HTTP responses.
+Десять наиболее популярных фильмов, включая фильмы без лайков:
 
-## Current limitations
+```sql
+SELECT f.id, f.name, COUNT(l.user_id) AS likes_count
+FROM films AS f
+LEFT JOIN likes AS l ON l.film_id = f.id
+GROUP BY f.id, f.name
+ORDER BY likes_count DESC, f.id
+LIMIT 10;
+```
 
-Data is stored in memory and is lost when the application restarts. Persistent storage and a service/repository layer are planned for later stages of the course.
+Друзья пользователя с ID 1 и статусы связей:
+
+```sql
+SELECT u.id, u.email, u.login, u.name, u.birthday, f.status
+FROM friendships AS f
+JOIN users AS u ON u.id = f.friend_id
+WHERE f.user_id = 1
+ORDER BY u.id;
+```
+
+Общие друзья пользователей с ID 1 и 2:
+
+```sql
+SELECT u.id, u.email, u.login, u.name, u.birthday
+FROM friendships AS first_user
+JOIN friendships AS second_user
+    ON first_user.friend_id = second_user.friend_id
+JOIN users AS u ON u.id = first_user.friend_id
+WHERE first_user.user_id = 1
+  AND second_user.user_id = 2
+ORDER BY u.id;
+```

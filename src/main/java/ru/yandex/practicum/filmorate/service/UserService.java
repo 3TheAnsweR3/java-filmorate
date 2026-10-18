@@ -4,9 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.FriendshipStatus;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,7 +25,7 @@ public class UserService {
 
     public User createUser(User user) {
         prepareUser(user);
-        user.setFriends(new HashSet<>());
+        user.setFriends(new HashMap<>());
         return userStorage.createNewUser(user);
     }
 
@@ -55,35 +57,34 @@ public class UserService {
         User user = userStorage.getUser(userId);
         User friend = userStorage.getUser(friendId);
 
-        boolean userChanged = user.getFriends().add(friendId);
-        boolean friendChanged = friend.getFriends().add(userId);
-
-        if (userChanged) {
-            userStorage.updateUser(user);
-        }
-        if (friendChanged) {
+        FriendshipStatus status = FriendshipStatus.UNCONFIRMED;
+        if (friend.getFriends().containsKey(userId)) {
+            status = FriendshipStatus.CONFIRMED;
+            friend.getFriends().put(userId, status);
             userStorage.updateUser(friend);
         }
 
-        log.info("Пользователи с id={} и id={} стали друзьями",
-                userId, friendId);
+        user.getFriends().put(friendId, status);
+        userStorage.updateUser(user);
+
+        log.info("Пользователь с id={} добавил пользователя с id={}, статус={}",
+                userId, friendId, status);
     }
 
     public void removeFriend(long userId, long friendId) {
         User user = userStorage.getUser(userId);
         User friend = userStorage.getUser(friendId);
 
-        boolean userChanged = user.getFriends().remove(friendId);
-        boolean friendChanged = friend.getFriends().remove(userId);
-
-        if (userChanged) {
+        FriendshipStatus removedStatus = user.getFriends().remove(friendId);
+        if (removedStatus != null) {
             userStorage.updateUser(user);
-        }
-        if (friendChanged) {
-            userStorage.updateUser(friend);
+            if (friend.getFriends().containsKey(userId)) {
+                friend.getFriends().put(userId, FriendshipStatus.UNCONFIRMED);
+                userStorage.updateUser(friend);
+            }
         }
 
-        log.info("Пользователи с id={} и id={} больше не друзья",
+        log.info("Пользователь с id={} удалил свою связь с пользователем с id={}",
                 userId, friendId);
     }
 
@@ -91,6 +92,7 @@ public class UserService {
         User user = userStorage.getUser(userId);
 
         return user.getFriends()
+                .keySet()
                 .stream()
                 .map(userStorage::getUser)
                 .toList();
@@ -100,8 +102,8 @@ public class UserService {
         User user = userStorage.getUser(userId);
         User other = userStorage.getUser(otherId);
 
-        Set<Long> commonFriendIds = new HashSet<>(user.getFriends());
-        commonFriendIds.retainAll(other.getFriends());
+        Set<Long> commonFriendIds = new HashSet<>(user.getFriends().keySet());
+        commonFriendIds.retainAll(other.getFriends().keySet());
 
         return commonFriendIds
                 .stream()
