@@ -9,6 +9,7 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,5 +47,41 @@ public class UserDbStorageTest {
     @DisplayName("Получение несуществующего пользователя вызывает NotFoundException")
     void shouldThrowWhenUserNotFound() {
         assertThrows(NotFoundException.class, () -> userStorage.getUser(999L));
+    }
+
+    @Test
+    @DisplayName("Список пользователей содержит всех сохранённых пользователей")
+    void shouldGetAllUsers() {
+        User firstUser = new User();
+        firstUser.setEmail("ivan@example.com");
+        firstUser.setLogin("ivan");
+        firstUser.setName("Иван");
+        firstUser.setBirthday(LocalDate.of(1990, 5, 15));
+
+        User secondUser = new User();
+        secondUser.setEmail("alex@example.com");
+        secondUser.setLogin("alex");
+        secondUser.setName("Алексей");
+        secondUser.setBirthday(LocalDate.of(1995, 8, 20));
+
+        userStorage.createNewUser(firstUser);
+        userStorage.createNewUser(secondUser);
+
+        List<User> users = userStorage.getAllUsers();
+
+        assertEquals(2, users.size());
+        assertTrue(users.stream()
+                .anyMatch(user -> user.getId() == firstUser.getId()));
+        assertTrue(users.stream()
+                .anyMatch(user -> user.getId() == secondUser.getId()));
+    }
+
+    @Test
+    @DisplayName("При отсутствии пользователей возвращается пустой список")
+    void shouldReturnEmptyListWhenNoUsers() {
+        List<User> users = userStorage.getAllUsers();
+
+        assertNotNull(users);
+        assertTrue(users.isEmpty());
     }
 }

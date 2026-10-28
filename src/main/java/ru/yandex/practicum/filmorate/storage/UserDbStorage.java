@@ -57,7 +57,8 @@ public class UserDbStorage implements UserStorage {
 
     @Override
     public List<User> getAllUsers() {
-        return List.of();
+        String sql = "SELECT id, email, login, name, birthday FROM users ORDER BY id";
+        return jdbcTemplate.query(sql, this::mapRowToUser);
     }
 
     @Override
