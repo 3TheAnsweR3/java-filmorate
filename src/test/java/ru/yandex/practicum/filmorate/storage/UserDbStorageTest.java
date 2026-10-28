@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
@@ -39,5 +40,11 @@ public class UserDbStorageTest {
         assertEquals("ivan", foundUser.getLogin());
         assertEquals("Иван", foundUser.getName());
         assertEquals(LocalDate.of(1990, 5, 15), foundUser.getBirthday());
+    }
+
+    @Test
+    @DisplayName("Получение несуществующего пользователя вызывает NotFoundException")
+    void shouldThrowWhenUserNotFound() {
+        assertThrows(NotFoundException.class, () -> userStorage.getUser(999L));
     }
 }

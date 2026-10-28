@@ -1,8 +1,10 @@
 package ru.yandex.practicum.filmorate.storage;
 
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.sql.Date;
@@ -46,7 +48,11 @@ public class UserDbStorage implements UserStorage {
     @Override
     public User getUser(long id) {
         String sql = "SELECT id, email, login, name, birthday FROM users WHERE id = ?";
-        return jdbcTemplate.queryForObject(sql, this::mapRowToUser, id);
+        try {
+            return jdbcTemplate.queryForObject(sql, this::mapRowToUser, id);
+        } catch (EmptyResultDataAccessException e) {
+            throw new NotFoundException("Пользователь с id " + id + " не найден");
+        }
     }
 
     @Override
