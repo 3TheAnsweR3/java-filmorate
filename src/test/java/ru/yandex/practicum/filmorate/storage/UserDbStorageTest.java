@@ -77,6 +77,54 @@ public class UserDbStorageTest {
     }
 
     @Test
+    @DisplayName("Обновление пользователя сохраняет новые данные без создания новой записи")
+    void shouldUpdateUser() {
+        User user = new User();
+        user.setEmail("ivan@example.com");
+        user.setLogin("ivan");
+        user.setName("Иван");
+        user.setBirthday(LocalDate.of(1990, 5, 15));
+        userStorage.createNewUser(user);
+
+        User updatedUser = new User();
+        updatedUser.setId(user.getId());
+        updatedUser.setEmail("new@example.com");
+        updatedUser.setLogin("ivan_new");
+        updatedUser.setName("Новое имя");
+        updatedUser.setBirthday(LocalDate.of(1991, 6, 16));
+
+        User result = userStorage.updateUser(updatedUser);
+
+        assertNotNull(result);
+        assertEquals(user.getId(), result.getId());
+
+        User foundUser = userStorage.getUser(user.getId());
+
+        assertEquals(user.getId(), foundUser.getId());
+        assertEquals("new@example.com", foundUser.getEmail());
+        assertEquals("ivan_new", foundUser.getLogin());
+        assertEquals("Новое имя", foundUser.getName());
+        assertEquals(LocalDate.of(1991, 6, 16), foundUser.getBirthday());
+        assertEquals(1, userStorage.getAllUsers().size());
+    }
+
+    @Test
+    @DisplayName("Обновление несуществующего пользователя вызывает NotFoundException")
+    void shouldThrowWhenUpdatingUnknownUser() {
+        User user = new User();
+        user.setId(999L);
+        user.setEmail("unknown@example.com");
+        user.setLogin("unknown");
+        user.setName("Неизвестный");
+        user.setBirthday(LocalDate.of(1990, 5, 15));
+
+        assertThrows(
+                NotFoundException.class,
+                () -> userStorage.updateUser(user)
+        );
+    }
+
+    @Test
     @DisplayName("При отсутствии пользователей возвращается пустой список")
     void shouldReturnEmptyListWhenNoUsers() {
         List<User> users = userStorage.getAllUsers();

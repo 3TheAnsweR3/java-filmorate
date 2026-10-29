@@ -42,7 +42,24 @@ public class UserDbStorage implements UserStorage {
 
     @Override
     public User updateUser(User user) {
-        return null;
+        String sql = "UPDATE users SET email = ?, login = ?, name = ?, birthday = ? WHERE id = ?";
+
+        int updatedRows = jdbcTemplate.update(
+                sql,
+                user.getEmail(),
+                user.getLogin(),
+                user.getName(),
+                Date.valueOf(user.getBirthday()),
+                user.getId()
+        );
+
+        if (updatedRows == 0) {
+            throw new NotFoundException(
+                    "Пользователь с id " + user.getId() + " не найден"
+            );
+        }
+
+        return user;
     }
 
     @Override
