@@ -125,6 +125,34 @@ public class UserDbStorageTest {
     }
 
     @Test
+    @DisplayName("Удалённый пользователь больше не доступен по ID")
+    void shouldDeleteUser() {
+        User user = new User();
+        user.setEmail("ivan@example.com");
+        user.setLogin("ivan");
+        user.setName("Иван");
+        user.setBirthday(LocalDate.of(1990, 5, 15));
+        userStorage.createNewUser(user);
+
+        userStorage.deleteUser(user.getId());
+
+        assertThrows(
+                NotFoundException.class,
+                () -> userStorage.getUser(user.getId())
+        );
+        assertTrue(userStorage.getAllUsers().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Удаление несуществующего пользователя вызывает NotFoundException")
+    void shouldThrowWhenDeletingUnknownUser() {
+        assertThrows(
+                NotFoundException.class,
+                () -> userStorage.deleteUser(999L)
+        );
+    }
+
+    @Test
     @DisplayName("При отсутствии пользователей возвращается пустой список")
     void shouldReturnEmptyListWhenNoUsers() {
         List<User> users = userStorage.getAllUsers();

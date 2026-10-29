@@ -80,7 +80,14 @@ public class UserDbStorage implements UserStorage {
 
     @Override
     public void deleteUser(long id) {
+        String sql = "DELETE FROM users WHERE id = ?";
+        int deletedRows = jdbcTemplate.update(sql, id);
 
+        if (deletedRows == 0) {
+            throw new NotFoundException(
+                    "Пользователь с id " + id + " не найден"
+            );
+        }
     }
 
     private User mapRowToUser(ResultSet resultSet, int rowNum) throws SQLException {
