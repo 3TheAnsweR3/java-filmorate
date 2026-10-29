@@ -23,11 +23,12 @@ public class UserDbStorageTest {
     @Test
     @DisplayName("Созданный пользователь доступен по ID со всеми сохранёнными полями")
     void shouldCreateAndGetUserById() {
-        User user = new User();
-        user.setEmail("ivan@example.com");
-        user.setLogin("ivan");
-        user.setName("Иван");
-        user.setBirthday(LocalDate.of(1990, 5, 15));
+        User user = buildUser(
+                "ivan@example.com",
+                "ivan",
+                "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
 
         User createdUser = userStorage.createNewUser(user);
         assertNotNull(createdUser);
@@ -52,17 +53,19 @@ public class UserDbStorageTest {
     @Test
     @DisplayName("Список пользователей содержит всех сохранённых пользователей")
     void shouldGetAllUsers() {
-        User firstUser = new User();
-        firstUser.setEmail("ivan@example.com");
-        firstUser.setLogin("ivan");
-        firstUser.setName("Иван");
-        firstUser.setBirthday(LocalDate.of(1990, 5, 15));
+        User firstUser = buildUser(
+                "ivan@example.com",
+                "ivan",
+                "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
 
-        User secondUser = new User();
-        secondUser.setEmail("alex@example.com");
-        secondUser.setLogin("alex");
-        secondUser.setName("Алексей");
-        secondUser.setBirthday(LocalDate.of(1995, 8, 20));
+        User secondUser = buildUser(
+                "alex@example.com",
+                "alex",
+                "Алексей",
+                LocalDate.of(1995, 8, 20)
+        );
 
         userStorage.createNewUser(firstUser);
         userStorage.createNewUser(secondUser);
@@ -79,19 +82,23 @@ public class UserDbStorageTest {
     @Test
     @DisplayName("Обновление пользователя сохраняет новые данные без создания новой записи")
     void shouldUpdateUser() {
-        User user = new User();
-        user.setEmail("ivan@example.com");
-        user.setLogin("ivan");
-        user.setName("Иван");
-        user.setBirthday(LocalDate.of(1990, 5, 15));
+        User user = buildUser(
+                "ivan@example.com",
+                "ivan",
+                "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
+
         userStorage.createNewUser(user);
 
-        User updatedUser = new User();
+        User updatedUser = buildUser(
+                "new@example.com",
+                "ivan_new",
+                "Новое имя",
+                LocalDate.of(1991, 6, 16)
+        );
+
         updatedUser.setId(user.getId());
-        updatedUser.setEmail("new@example.com");
-        updatedUser.setLogin("ivan_new");
-        updatedUser.setName("Новое имя");
-        updatedUser.setBirthday(LocalDate.of(1991, 6, 16));
 
         User result = userStorage.updateUser(updatedUser);
 
@@ -111,12 +118,14 @@ public class UserDbStorageTest {
     @Test
     @DisplayName("Обновление несуществующего пользователя вызывает NotFoundException")
     void shouldThrowWhenUpdatingUnknownUser() {
-        User user = new User();
+        User user = buildUser(
+
+                "unknown@example.com",
+                "unknown",
+                "Неизвестный",
+                LocalDate.of(1990, 5, 15)
+        );
         user.setId(999L);
-        user.setEmail("unknown@example.com");
-        user.setLogin("unknown");
-        user.setName("Неизвестный");
-        user.setBirthday(LocalDate.of(1990, 5, 15));
 
         assertThrows(
                 NotFoundException.class,
@@ -127,11 +136,13 @@ public class UserDbStorageTest {
     @Test
     @DisplayName("Удалённый пользователь больше не доступен по ID")
     void shouldDeleteUser() {
-        User user = new User();
-        user.setEmail("ivan@example.com");
-        user.setLogin("ivan");
-        user.setName("Иван");
-        user.setBirthday(LocalDate.of(1990, 5, 15));
+        User user = buildUser(
+                "ivan@example.com",
+                "ivan",
+                "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
+
         userStorage.createNewUser(user);
 
         userStorage.deleteUser(user.getId());
@@ -159,5 +170,14 @@ public class UserDbStorageTest {
 
         assertNotNull(users);
         assertTrue(users.isEmpty());
+    }
+
+    private User buildUser(String email, String login, String name, LocalDate birthday) {
+        User user = new User();
+        user.setEmail(email);
+        user.setLogin(login);
+        user.setName(name);
+        user.setBirthday(birthday);
+        return user;
     }
 }
