@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.model.FriendshipStatus;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
@@ -161,6 +162,98 @@ public class UserDbStorageTest {
                 NotFoundException.class,
                 () -> userStorage.deleteUser(999L)
         );
+    }
+
+    @Test
+    @DisplayName("Обновление пользователя сохраняет исходящую связь с другом и её статус")
+    void shouldSaveFriendshipWhenUpdatingUser() {
+        User user = buildUser(
+                "ivan@example.com", "ivan", "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
+        User friend = buildUser(
+                "alex@example.com", "alex", "Алексей",
+                LocalDate.of(1995, 8, 20)
+        );
+
+        userStorage.createNewUser(user);
+        userStorage.createNewUser(friend);
+
+        user.getFriends().put(friend.getId(), FriendshipStatus.UNCONFIRMED);
+        userStorage.updateUser(user);
+
+        User foundUser = userStorage.getUser(user.getId());
+        User foundFriend = userStorage.getUser(friend.getId());
+
+        assertEquals(1, foundUser.getFriends().size());
+        assertEquals(
+                FriendshipStatus.UNCONFIRMED,
+                foundUser.getFriends().get(friend.getId())
+        );
+        assertTrue(foundFriend.getFriends().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Список пользователей содержит сохранённые связи с друзьями")
+    void shouldGetAllUsersWithFriendships() {
+        User user = buildUser(
+                "ivan@example.com", "ivan", "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
+        User friend = buildUser(
+                "alex@example.com", "alex", "Алексей",
+                LocalDate.of(1995, 8, 20)
+        );
+
+        userStorage.createNewUser(user);
+        userStorage.createNewUser(friend);
+
+        user.getFriends().put(friend.getId(), FriendshipStatus.UNCONFIRMED);
+        userStorage.updateUser(user);
+
+        List<User> users = userStorage.getAllUsers();
+
+        User foundUser = users.stream()
+                .filter(item -> item.getId() == user.getId())
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(1, foundUser.getFriends().size());
+        assertEquals(
+                FriendshipStatus.UNCONFIRMED,
+                foundUser.getFriends().get(friend.getId())
+        );
+    }
+
+    @Test
+    @DisplayName("При удалении пользователя удаляются его входящие и исходящие связи")
+    void shouldDeleteUserWithFriendships() {
+        User user = buildUser(
+                "ivan@example.com", "ivan", "Иван",
+                LocalDate.of(1990, 5, 15)
+        );
+        User friend = buildUser(
+                "alex@example.com", "alex", "Алексей",
+                LocalDate.of(1995, 8, 20)
+        );
+
+        userStorage.createNewUser(user);
+        userStorage.createNewUser(friend);
+
+        user.getFriends().put(friend.getId(), FriendshipStatus.CONFIRMED);
+        friend.getFriends().put(user.getId(), FriendshipStatus.CONFIRMED);
+        userStorage.updateUser(user);
+        userStorage.updateUser(friend);
+
+        userStorage.deleteUser(user.getId());
+
+        assertThrows(
+                NotFoundException.class,
+                () -> userStorage.getUser(user.getId())
+        );
+
+        User remainingFriend = userStorage.getUser(friend.getId());
+        assertTrue(remainingFriend.getFriends().isEmpty());
     }
 
     @Test

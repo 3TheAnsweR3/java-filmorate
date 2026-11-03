@@ -5,14 +5,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.model.FriendshipStatus;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public class UserDbStorage implements UserStorage {
@@ -43,6 +47,7 @@ public class UserDbStorage implements UserStorage {
     }
 
     @Override
+    @Transactional
     public User updateUser(User user) {
         String sql = "UPDATE users SET email = ?, login = ?, name = ?, birthday = ? WHERE id = ?";
 
@@ -61,6 +66,20 @@ public class UserDbStorage implements UserStorage {
             );
         }
 
+        String deleteSql = "DELETE FROM friendships WHERE user_id = ?";
+        jdbcTemplate.update(deleteSql, user.getId());
+
+        String insertSql = "INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)";
+
+        for (Map.Entry<Long, FriendshipStatus> entry : user.getFriends().entrySet()) {
+            jdbcTemplate.update(
+                    insertSql,
+                    user.getId(),
+                    entry.getKey(),
+                    entry.getValue().name()
+            );
+        }
+
         return user;
     }
 
@@ -68,7 +87,9 @@ public class UserDbStorage implements UserStorage {
     public User getUser(long id) {
         String sql = "SELECT id, email, login, name, birthday FROM users WHERE id = ?";
         try {
-            return jdbcTemplate.queryForObject(sql, this::mapRowToUser, id);
+            User user = jdbcTemplate.queryForObject(sql, this::mapRowToUser, id);
+            user.setFriends(getFriends(id));
+            return user;
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("Пользователь с id " + id + " не найден");
         }
@@ -77,11 +98,22 @@ public class UserDbStorage implements UserStorage {
     @Override
     public List<User> getAllUsers() {
         String sql = "SELECT id, email, login, name, birthday FROM users ORDER BY id";
-        return jdbcTemplate.query(sql, this::mapRowToUser);
+        List<User> users = jdbcTemplate.query(sql, this::mapRowToUser);
+
+        for (User user : users) {
+            user.setFriends(getFriends(user.getId()));
+        }
+
+        return users;
     }
 
+    @Transactional
     @Override
     public void deleteUser(long id) {
+        String deleteFriendshipsSql =
+                "DELETE FROM friendships WHERE user_id = ? OR friend_id = ?";
+        jdbcTemplate.update(deleteFriendshipsSql, id, id);
+
         String sql = "DELETE FROM users WHERE id = ?";
         int deletedRows = jdbcTemplate.update(sql, id);
 
@@ -100,5 +132,23 @@ public class UserDbStorage implements UserStorage {
         user.setName(resultSet.getString("name"));
         user.setBirthday(resultSet.getDate("birthday").toLocalDate());
         return user;
+    }
+
+    private Map<Long, FriendshipStatus> getFriends(long userId) {
+        String sql = "SELECT friend_id, status FROM friendships WHERE user_id = ?";
+
+        return jdbcTemplate.query(sql, resultSet -> {
+            Map<Long, FriendshipStatus> friends = new HashMap<>();
+
+            while (resultSet.next()) {
+                long friendId = resultSet.getLong("friend_id");
+                FriendshipStatus status = FriendshipStatus.valueOf(
+                        resultSet.getString("status")
+                );
+                friends.put(friendId, status);
+            }
+
+            return friends;
+        }, userId);
     }
 }
