@@ -30,7 +30,7 @@ public class Film {
 
     private List<String> genre = new ArrayList<>();
 
-    private String rating;
+    private Mpa mpa;
 
     private Set<Long> likes = new HashSet<>();
 }

@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -164,6 +165,62 @@ public class FilmDbStorageTest {
                 NotFoundException.class,
                 () -> filmStorage.deleteFilm(999L)
         );
+    }
+
+    @Test
+    @DisplayName("Рейтинг MPA сохраняется вместе с фильмом и возвращается при чтении")
+    void shouldCreateAndGetFilmWithMpa() {
+        Film film = buildFilm(
+                "Interstellar",
+                "Space",
+                LocalDate.of(2014, 10, 26),
+                169
+        );
+
+        Mpa mpa = new Mpa();
+        mpa.setId(3);
+        mpa.setName("PG-13");
+        film.setMpa(mpa);
+
+        Film createdFilm = filmStorage.createNewFilm(film);
+
+        Film foundFilm = filmStorage.getFilm(createdFilm.getId());
+
+        assertNotNull(foundFilm.getMpa());
+        assertEquals(3, foundFilm.getMpa().getId());
+        assertEquals("PG-13", foundFilm.getMpa().getName());
+    }
+
+    @Test
+    @DisplayName("Обновление фильма сохраняет новый рейтинг MPA")
+    void shouldUpdateFilmMpa() {
+        Film film = buildFilm(
+                "Interstellar",
+                "Space",
+                LocalDate.of(2014, 10, 26),
+                169
+        );
+
+        Mpa initialMpa = new Mpa();
+        initialMpa.setId(3);
+        initialMpa.setName("PG-13");
+        film.setMpa(initialMpa);
+
+        filmStorage.createNewFilm(film);
+
+        Mpa updatedMpa = new Mpa();
+        updatedMpa.setId(4);
+        updatedMpa.setName("R");
+        film.setMpa(updatedMpa);
+
+        filmStorage.updateFilm(film);
+
+        Film foundFilm = filmStorage.getFilm(film.getId());
+
+        assertNotNull(foundFilm.getMpa());
+        assertEquals(4, foundFilm.getMpa().getId());
+        assertEquals("R", foundFilm.getMpa().getName());
+        assertEquals(1, filmStorage.getAllFilms().size());
     }
 
     private Film buildFilm(String name, String description, LocalDate releaseDate, int duration) {
