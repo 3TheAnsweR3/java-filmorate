@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+@Repository
 public class FilmDbStorage implements FilmStorage {
     private static final String SELECT_FILMS =
             "SELECT f.id, f.name, f.description, f.release_date, f.duration, "
@@ -37,8 +39,11 @@ public class FilmDbStorage implements FilmStorage {
     private final JdbcTemplate jdbcTemplate;
     private final NamedParameterJdbcTemplate namedJdbcTemplate;
 
-    public FilmDbStorage(JdbcTemplate jdbcTemplate) {
+    private final MpaDbStorage mpaDbStorage;
+
+    public FilmDbStorage(JdbcTemplate jdbcTemplate, MpaDbStorage mpaDbStorage) {
         this.jdbcTemplate = jdbcTemplate;
+        this.mpaDbStorage = mpaDbStorage;
         this.namedJdbcTemplate = new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
@@ -48,6 +53,7 @@ public class FilmDbStorage implements FilmStorage {
         String sql = "INSERT INTO films (name, description, release_date, duration, rating_id) "
                 + "VALUES (?, ?, ?, ?, ?)";
 
+        Mpa mpa = resolveMpa(film.getMpa());
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbcTemplate.update(connection -> {
@@ -58,10 +64,10 @@ public class FilmDbStorage implements FilmStorage {
             statement.setString(2, film.getDescription());
             statement.setDate(3, Date.valueOf(film.getReleaseDate()));
             statement.setInt(4, film.getDuration());
-            if (film.getMpa() == null) {
+            if (mpa == null) {
                 statement.setNull(5, java.sql.Types.INTEGER);
             } else {
-                statement.setInt(5, film.getMpa().getId());
+                statement.setInt(5, mpa.getId());
             }
             return statement;
         }, keyHolder);
@@ -75,6 +81,7 @@ public class FilmDbStorage implements FilmStorage {
         film.setGenres(loadGenres(filmId));
         film.setLikes(new HashSet<>());
         film.setId(filmId);
+        film.setMpa(mpa);
         return film;
     }
 
@@ -84,13 +91,14 @@ public class FilmDbStorage implements FilmStorage {
         String sql = "UPDATE films SET name = ?, description = ?, "
                 + "release_date = ?, duration = ?, rating_id = ? WHERE id = ?";
 
+        Mpa mpa = resolveMpa(updatedFilm.getMpa());
         int updatedRows = jdbcTemplate.update(
                 sql,
                 updatedFilm.getName(),
                 updatedFilm.getDescription(),
                 Date.valueOf(updatedFilm.getReleaseDate()),
                 updatedFilm.getDuration(),
-                updatedFilm.getMpa() == null ? null : updatedFilm.getMpa().getId(),
+                mpa == null ? null : mpa.getId(),
                 updatedFilm.getId()
         );
 
@@ -104,6 +112,7 @@ public class FilmDbStorage implements FilmStorage {
         saveGenres(updatedFilm.getId(), updatedFilm.getGenres());
         updatedFilm.setGenres(loadGenres(updatedFilm.getId()));
         updatedFilm.setLikes(loadLikes(updatedFilm.getId()));
+        updatedFilm.setMpa(mpa);
         return updatedFilm;
     }
 
@@ -129,15 +138,18 @@ public class FilmDbStorage implements FilmStorage {
         return films;
     }
 
+    @Override
     public void addLike(long filmId, long userId) {
         String sql = "MERGE INTO likes (film_id, user_id) KEY (film_id, user_id) VALUES (?, ?)";
         jdbcTemplate.update(sql, filmId, userId);
     }
 
+    @Override
     public void removeLike(long filmId, long userId) {
         jdbcTemplate.update("DELETE FROM likes WHERE film_id = ? AND user_id = ?", filmId, userId);
     }
 
+    @Override
     public List<Film> getPopular(int count) {
         String sql = SELECT_FILMS
                 + " LEFT JOIN (SELECT film_id, COUNT(*) AS like_count FROM likes GROUP BY film_id) AS totals "
@@ -160,6 +172,17 @@ public class FilmDbStorage implements FilmStorage {
             throw new NotFoundException(
                     "Фильм с id " + id + " не найден"
             );
+        }
+    }
+
+    private Mpa resolveMpa(Mpa mpa) {
+        if (mpa == null) {
+            return null;
+        }
+        try {
+            return mpaDbStorage.getMpa(mpa.getId());
+        } catch (NotFoundException e) {
+            throw new ValidationException(e.getMessage());
         }
     }
 

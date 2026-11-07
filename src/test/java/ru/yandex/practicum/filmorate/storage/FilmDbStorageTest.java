@@ -20,7 +20,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@Import({FilmDbStorage.class, UserDbStorage.class})
+@Import({FilmDbStorage.class, UserDbStorage.class, MpaDbStorage.class})
 @JdbcTest
 @DisplayName("Хранение фильмов в базе данных")
 public class FilmDbStorageTest {

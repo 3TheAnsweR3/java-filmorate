@@ -10,7 +10,6 @@ import ru.yandex.practicum.filmorate.storage.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 
@@ -24,7 +23,8 @@ public class FilmService {
 
     @Autowired
     public FilmService(
-            FilmStorage filmStorage, @Qualifier("userDbStorage") UserStorage userStorage) {
+            @Qualifier("filmDbStorage") FilmStorage filmStorage,
+            @Qualifier("userDbStorage") UserStorage userStorage) {
 
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
@@ -56,25 +56,17 @@ public class FilmService {
     }
 
     public void addLike(long filmId, long userId) {
-        Film film = filmStorage.getFilm(filmId);
+        filmStorage.getFilm(filmId);
         userStorage.getUser(userId);
-
-        if (film.getLikes().add(userId)) {
-            filmStorage.updateFilm(film);
-            log.info("Пользователь с id={} поставил лайк фильму с id={}",
-                    userId, filmId);
-        }
+        filmStorage.addLike(filmId, userId);
+        log.info("Пользователь с id={} добавил лайк фильму с id={}", userId, filmId);
     }
 
     public void removeLike(long filmId, long userId) {
-        Film film = filmStorage.getFilm(filmId);
+        filmStorage.getFilm(filmId);
         userStorage.getUser(userId);
-
-        if (film.getLikes().remove(userId)) {
-            filmStorage.updateFilm(film);
-            log.info("Пользователь с id={} удалил лайк у фильма с id={}",
-                    userId, filmId);
-        }
+        filmStorage.removeLike(filmId, userId);
+        log.info("Пользователь с id={} удалил лайк у фильма с id={}", userId, filmId);
     }
 
     public List<Film> getPopular(int count) {
@@ -83,13 +75,7 @@ public class FilmService {
                     "Количество популярных фильмов не может быть отрицательным");
         }
 
-        return filmStorage.getAllFilms()
-                .stream()
-                .sorted(Comparator.comparingInt(
-                                (Film film) -> film.getLikes().size())
-                        .reversed())
-                .limit(count)
-                .toList();
+        return filmStorage.getPopular(count);
     }
 
     private void validateFilm(Film film) {
