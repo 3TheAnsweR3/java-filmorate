@@ -1,21 +1,33 @@
 package ru.yandex.practicum.filmorate.storage;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class FilmDbStorage implements FilmStorage {
+    private static final String SELECT_FILM_GENRES =
+            "SELECT fg.film_id, g.id, g.name FROM film_genres AS fg "
+                    + "JOIN genres AS g ON fg.genre_id = g.id";
     private final JdbcTemplate jdbcTemplate;
 
     public FilmDbStorage(JdbcTemplate jdbcTemplate) {
@@ -23,6 +35,7 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     @Override
+    @Transactional
     public Film createNewFilm(Film film) {
         String sql = "INSERT INTO films (name, description, release_date, duration, rating_id) "
                 + "VALUES (?, ?, ?, ?, ?)";
@@ -49,11 +62,15 @@ public class FilmDbStorage implements FilmStorage {
                 keyHolder.getKey(),
                 "База данных не вернула ID созданного фильма"
         );
-        film.setId(generatedId.longValue());
+        long filmId = generatedId.longValue();
+        saveGenres(filmId, film.getGenres());
+        film.setGenres(loadGenres(filmId));
+        film.setId(filmId);
         return film;
     }
 
     @Override
+    @Transactional
     public Film updateFilm(Film updatedFilm) {
         String sql = "UPDATE films SET name = ?, description = ?, "
                 + "release_date = ?, duration = ?, rating_id = ? WHERE id = ?";
@@ -74,6 +91,9 @@ public class FilmDbStorage implements FilmStorage {
             );
         }
 
+        deleteGenres(updatedFilm.getId());
+        saveGenres(updatedFilm.getId(), updatedFilm.getGenres());
+        updatedFilm.setGenres(loadGenres(updatedFilm.getId()));
         return updatedFilm;
     }
 
@@ -84,11 +104,14 @@ public class FilmDbStorage implements FilmStorage {
                 + "FROM films AS f "
                 + "LEFT JOIN ratings AS r ON f.rating_id = r.id "
                 + "WHERE f.id = ?";
+        Film film;
         try {
-            return jdbcTemplate.queryForObject(sql, this::mapRowToFilm, id);
+            film = jdbcTemplate.queryForObject(sql, this::mapRowToFilm, id);
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("Фильм с id " + id + " не найден");
         }
+        film.setGenres(loadGenres(id));
+        return film;
     }
 
     @Override
@@ -99,11 +122,29 @@ public class FilmDbStorage implements FilmStorage {
                 + "LEFT JOIN ratings AS r ON f.rating_id = r.id "
                 + "ORDER BY f.id";
 
-        return jdbcTemplate.query(sql, this::mapRowToFilm);
+        List<Film> films = jdbcTemplate.query(sql, this::mapRowToFilm);
+        if (films.isEmpty()) {
+            return films;
+        }
+
+        Map<Long, List<Genre>> genresByFilm = new HashMap<>();
+        jdbcTemplate.query(SELECT_FILM_GENRES + " ORDER BY fg.film_id, g.id", resultSet -> {
+            long filmId = resultSet.getLong("film_id");
+            genresByFilm.computeIfAbsent(filmId, id -> new ArrayList<>()).add(mapRowToGenre(resultSet));
+        });
+        for (Film film : films) {
+            List<Genre> genres = genresByFilm.get(film.getId());
+            if (genres != null) {
+                film.setGenres(genres);
+            }
+        }
+        return films;
     }
 
     @Override
+    @Transactional
     public void deleteFilm(long id) {
+        deleteGenres(id);
         String sql = "DELETE FROM films WHERE id = ?";
         int deletedRows = jdbcTemplate.update(sql, id);
 
@@ -112,6 +153,45 @@ public class FilmDbStorage implements FilmStorage {
                     "Фильм с id " + id + " не найден"
             );
         }
+    }
+
+    private void saveGenres(long filmId, List<Genre> genres) {
+        if (genres == null || genres.isEmpty()) {
+            return;
+        }
+
+        Set<Integer> genreIds = new LinkedHashSet<>();
+        for (Genre genre : genres) {
+            if (genre == null || genre.getId() <= 0) {
+                throw new ValidationException("У жанра должен быть положительный ID");
+            }
+            genreIds.add(genre.getId());
+        }
+
+        String sql = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
+        for (int genreId : genreIds) {
+            try {
+                jdbcTemplate.update(sql, filmId, genreId);
+            } catch (DataIntegrityViolationException e) {
+                throw new ValidationException("Жанр с id " + genreId + " не найден");
+            }
+        }
+    }
+
+    private void deleteGenres(long filmId) {
+        jdbcTemplate.update("DELETE FROM film_genres WHERE film_id = ?", filmId);
+    }
+
+    private List<Genre> loadGenres(long filmId) {
+        String sql = SELECT_FILM_GENRES + " WHERE fg.film_id = ? ORDER BY g.id";
+        return jdbcTemplate.query(sql, (resultSet, rowNum) -> mapRowToGenre(resultSet), filmId);
+    }
+
+    private Genre mapRowToGenre(ResultSet resultSet) throws SQLException {
+        Genre genre = new Genre();
+        genre.setId(resultSet.getInt("id"));
+        genre.setName(resultSet.getString("name"));
+        return genre;
     }
 
     private Film mapRowToFilm(ResultSet resultSet, int rowNum) throws SQLException {

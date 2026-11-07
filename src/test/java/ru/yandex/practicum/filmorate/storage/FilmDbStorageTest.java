@@ -5,8 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.time.LocalDate;
@@ -142,7 +146,9 @@ public class FilmDbStorageTest {
                 LocalDate.of(1999, 3, 31), 136
         );
 
+        film.setGenres(List.of(genre(2)));
         filmStorage.createNewFilm(film);
+        remainingFilm.setGenres(List.of(genre(4)));
         filmStorage.createNewFilm(remainingFilm);
 
         filmStorage.deleteFilm(film.getId());
@@ -221,6 +227,72 @@ public class FilmDbStorageTest {
         assertEquals(4, foundFilm.getMpa().getId());
         assertEquals("R", foundFilm.getMpa().getName());
         assertEquals(1, filmStorage.getAllFilms().size());
+    }
+
+    @Test
+    @DisplayName("Создание фильма сохраняет разные жанры, а чтение берёт названия из справочника")
+    void shouldCreateAndGetFilmWithGenres() {
+        Film film = buildFilm("Interstellar", "Space", LocalDate.of(2014, 10, 26), 169);
+        film.setGenres(List.of(genre(4), genre(2), genre(2)));
+
+        Film createdFilm = filmStorage.createNewFilm(film);
+        Film foundFilm = filmStorage.getFilm(createdFilm.getId());
+
+        assertEquals(List.of(2, 4), foundFilm.getGenres().stream().map(Genre::getId).toList());
+        assertEquals(List.of("Драма", "Триллер"), foundFilm.getGenres().stream().map(Genre::getName).toList());
+        assertEquals(foundFilm.getGenres(), createdFilm.getGenres());
+
+        Film anotherFilm = buildFilm("The Matrix", "Simulation", LocalDate.of(1999, 3, 31), 136);
+        anotherFilm.setGenres(List.of(genre(6)));
+        filmStorage.createNewFilm(anotherFilm);
+        List<Film> films = filmStorage.getAllFilms();
+        assertEquals(foundFilm.getGenres(), films.get(0).getGenres());
+        assertEquals(List.of(6), films.get(1).getGenres().stream().map(Genre::getId).toList());
+    }
+
+    @Test
+    @DisplayName("Обновление заменяет жанры фильма, а пустой список удаляет все связи")
+    void shouldReplaceAndClearFilmGenres() {
+        Film film = buildFilm("Interstellar", "Space", LocalDate.of(2014, 10, 26), 169);
+        film.setGenres(List.of(genre(2), genre(4)));
+        filmStorage.createNewFilm(film);
+
+        film.setGenres(List.of(genre(4), genre(6)));
+        Film updatedFilm = filmStorage.updateFilm(film);
+        List<Genre> genres = filmStorage.getFilm(film.getId()).getGenres();
+        assertEquals(List.of(4, 6), genres.stream().map(Genre::getId).toList());
+        assertEquals(genres, updatedFilm.getGenres());
+
+        film.setGenres(List.of());
+        filmStorage.updateFilm(film);
+        assertTrue(filmStorage.getFilm(film.getId()).getGenres().isEmpty());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("Неизвестный жанр отменяет обновление фильма и сохраняет прежние связи")
+    void shouldKeepStoredFilmWhenGenreIsUnknown() {
+        Film film = buildFilm("Interstellar", "Space", LocalDate.of(2014, 10, 26), 169);
+        film.setGenres(List.of(genre(2)));
+        filmStorage.createNewFilm(film);
+
+        try {
+            film.setName("New name");
+            film.setGenres(List.of(genre(4), genre(999)));
+            assertThrows(ValidationException.class, () -> filmStorage.updateFilm(film));
+
+            Film foundFilm = filmStorage.getFilm(film.getId());
+            assertEquals("Interstellar", foundFilm.getName());
+            assertEquals(List.of(2), foundFilm.getGenres().stream().map(Genre::getId).toList());
+        } finally {
+            filmStorage.deleteFilm(film.getId());
+        }
+    }
+
+    private Genre genre(int id) {
+        Genre genre = new Genre();
+        genre.setId(id);
+        return genre;
     }
 
     private Film buildFilm(String name, String description, LocalDate releaseDate, int duration) {

@@ -28,7 +28,7 @@ public class Film {
     @Positive
     private int duration;
 
-    private List<String> genre = new ArrayList<>();
+    private List<Genre> genres = new ArrayList<>();
 
     private Mpa mpa;
 

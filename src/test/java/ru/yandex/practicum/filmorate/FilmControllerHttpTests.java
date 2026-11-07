@@ -28,25 +28,25 @@ class FilmControllerHttpTests {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("Фильм должен сохранять несколько жанров и возрастной рейтинг")
-    void shouldCreateFilmWithGenresAndRating() throws Exception {
+    @DisplayName("POST /films принимает идентификаторы жанров и рейтинга")
+    void shouldAcceptGenreAndMpaIds() throws Exception {
         String json = objectMapper.writeValueAsString(Map.of(
                 "name", "Genre test film",
                 "description", "Film with two genres",
                 "releaseDate", "2014-11-05",
                 "duration", 169,
-                "genre", List.of("Drama", "Thriller"),
-                "rating", "PG-13"
+                "genres", List.of(Map.of("id", 2), Map.of("id", 4)),
+                "mpa", Map.of("id", 3)
         ));
 
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.genre.length()").value(2))
-                .andExpect(jsonPath("$.genre[0]").value("Drama"))
-                .andExpect(jsonPath("$.genre[1]").value("Thriller"))
-                .andExpect(jsonPath("$.rating").value("PG-13"));
+                .andExpect(jsonPath("$.genres.length()").value(2))
+                .andExpect(jsonPath("$.genres[0].id").value(2))
+                .andExpect(jsonPath("$.genres[1].id").value(4))
+                .andExpect(jsonPath("$.mpa.id").value(3));
     }
 
     @Test
