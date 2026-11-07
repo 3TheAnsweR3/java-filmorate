@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
@@ -284,7 +283,7 @@ public class FilmDbStorageTest {
         try {
             film.setName("New name");
             film.setGenres(List.of(genre(4), genre(999)));
-            assertThrows(ValidationException.class, () -> filmStorage.updateFilm(film));
+            assertThrows(NotFoundException.class, () -> filmStorage.updateFilm(film));
 
             Film foundFilm = filmStorage.getFilm(film.getId());
             assertEquals("Interstellar", foundFilm.getName());

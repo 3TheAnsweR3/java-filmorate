@@ -179,11 +179,7 @@ public class FilmDbStorage implements FilmStorage {
         if (mpa == null) {
             return null;
         }
-        try {
-            return mpaDbStorage.getMpa(mpa.getId());
-        } catch (NotFoundException e) {
-            throw new ValidationException(e.getMessage());
-        }
+        return mpaDbStorage.getMpa(mpa.getId());
     }
 
     private void loadFilmRelations(List<Film> films) {
@@ -234,7 +230,7 @@ public class FilmDbStorage implements FilmStorage {
             try {
                 jdbcTemplate.update(sql, filmId, genreId);
             } catch (DataIntegrityViolationException e) {
-                throw new ValidationException("Жанр с id " + genreId + " не найден");
+                throw new NotFoundException("Жанр с id " + genreId + " не найден");
             }
         }
     }

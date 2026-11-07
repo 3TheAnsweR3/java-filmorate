@@ -65,12 +65,12 @@ class FilmControllerHttpTests {
     }
 
     @Test
-    @DisplayName("Создание фильма с неизвестным рейтингом возвращает 400")
+    @DisplayName("Создание фильма с неизвестным рейтингом возвращает 404")
     void shouldRejectUnknownMpa() throws Exception {
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(filmRequest(999, List.of()).toString()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
     }
 
     @Test
