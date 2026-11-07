@@ -12,18 +12,23 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@Import(FilmDbStorage.class)
+@Import({FilmDbStorage.class, UserDbStorage.class})
 @JdbcTest
 @DisplayName("Хранение фильмов в базе данных")
 public class FilmDbStorageTest {
     @Autowired
     private FilmDbStorage filmStorage;
+
+    @Autowired
+    private UserDbStorage userStorage;
 
     @Test
     @DisplayName("Созданный фильм доступен по ID со всеми сохранёнными полями")
@@ -287,6 +292,89 @@ public class FilmDbStorageTest {
         } finally {
             filmStorage.deleteFilm(film.getId());
         }
+    }
+
+    @Test
+    @DisplayName("Повторный лайк не дублируется, а удаление убирает только выбранный лайк")
+    void shouldAddAndRemoveLikes() {
+        Film film = filmStorage.createNewFilm(
+                buildFilm("Interstellar", "Space", LocalDate.of(2014, 10, 26), 169));
+        User firstUser = createUser("first");
+        User secondUser = createUser("second");
+
+        filmStorage.addLike(film.getId(), firstUser.getId());
+        filmStorage.addLike(film.getId(), firstUser.getId());
+        filmStorage.addLike(film.getId(), secondUser.getId());
+        assertEquals(Set.of(firstUser.getId(), secondUser.getId()), filmStorage.getFilm(film.getId()).getLikes());
+
+        film.setLikes(Set.of());
+        assertEquals(Set.of(firstUser.getId(), secondUser.getId()), filmStorage.updateFilm(film).getLikes());
+
+        filmStorage.removeLike(film.getId(), firstUser.getId());
+        filmStorage.removeLike(film.getId(), firstUser.getId());
+        assertEquals(Set.of(secondUser.getId()), filmStorage.getAllFilms().getFirst().getLikes());
+    }
+
+    @Test
+    @DisplayName("Популярность учитывает число лайков, а при равенстве фильмы идут по ID")
+    void shouldOrderPopularFilmsByLikeCount() {
+        Film first = filmStorage.createNewFilm(
+                buildFilm("First", "No likes", LocalDate.of(2014, 10, 26), 169));
+        Film second = filmStorage.createNewFilm(
+                buildFilm("Second", "One like", LocalDate.of(2014, 10, 26), 169));
+        Film third = filmStorage.createNewFilm(
+                buildFilm("Third", "Two likes", LocalDate.of(2014, 10, 26), 169));
+        Film fourth = filmStorage.createNewFilm(
+                buildFilm("Fourth", "One like", LocalDate.of(2014, 10, 26), 169));
+        User firstUser = createUser("first");
+        User secondUser = createUser("second");
+
+        third.setGenres(List.of(genre(2)));
+        filmStorage.updateFilm(third);
+        filmStorage.addLike(second.getId(), firstUser.getId());
+        filmStorage.addLike(third.getId(), firstUser.getId());
+        filmStorage.addLike(third.getId(), secondUser.getId());
+        filmStorage.addLike(fourth.getId(), secondUser.getId());
+
+        List<Film> popular = filmStorage.getPopular(2);
+        assertEquals(List.of(third.getId(), second.getId()), popular.stream().map(Film::getId).toList());
+        assertEquals(Set.of(firstUser.getId(), secondUser.getId()), popular.getFirst().getLikes());
+        assertEquals(List.of(2), popular.getFirst().getGenres().stream().map(Genre::getId).toList());
+        assertEquals(List.of(third.getId(), second.getId(), fourth.getId(), first.getId()),
+                filmStorage.getPopular(10).stream().map(Film::getId).toList());
+        assertTrue(filmStorage.getPopular(0).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Удаление фильма и пользователя убирает их лайки, сохраняя остальные")
+    void shouldDeleteOnlyRelatedLikes() {
+        Film deleted = filmStorage.createNewFilm(
+                buildFilm("Interstellar", "Space", LocalDate.of(2014, 10, 26), 169));
+        Film remaining = filmStorage.createNewFilm(
+                buildFilm("The Matrix", "Simulation", LocalDate.of(1999, 3, 31), 136));
+        User firstUser = createUser("first");
+        User secondUser = createUser("second");
+
+        filmStorage.addLike(deleted.getId(), firstUser.getId());
+        filmStorage.addLike(remaining.getId(), firstUser.getId());
+        filmStorage.addLike(remaining.getId(), secondUser.getId());
+
+        filmStorage.deleteFilm(deleted.getId());
+        assertThrows(NotFoundException.class, () -> filmStorage.getFilm(deleted.getId()));
+        assertEquals(Set.of(firstUser.getId(), secondUser.getId()), filmStorage.getFilm(remaining.getId()).getLikes());
+
+        userStorage.deleteUser(firstUser.getId());
+        assertThrows(NotFoundException.class, () -> userStorage.getUser(firstUser.getId()));
+        assertEquals(Set.of(secondUser.getId()), filmStorage.getFilm(remaining.getId()).getLikes());
+    }
+
+    private User createUser(String login) {
+        User user = new User();
+        user.setLogin(login);
+        user.setEmail(login + "@example.com");
+        user.setName(login);
+        user.setBirthday(LocalDate.of(1990, 1, 1));
+        return userStorage.createNewUser(user);
     }
 
     private Genre genre(int id) {
