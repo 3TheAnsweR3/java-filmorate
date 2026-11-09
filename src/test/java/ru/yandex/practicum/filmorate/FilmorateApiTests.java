@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:filmorate-api-tests")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 class FilmorateApiTests {
@@ -42,6 +42,9 @@ class FilmorateApiTests {
         mockMvc.perform(put("/users/{id}/friends/{friendId}",
                         firstUserId, commonUserId))
                 .andExpect(status().isOk());
+        mockMvc.perform(get("/users/{id}/friends", commonUserId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
         mockMvc.perform(put("/users/{id}/friends/{friendId}",
                         secondUserId, commonUserId))
                 .andExpect(status().isOk());
