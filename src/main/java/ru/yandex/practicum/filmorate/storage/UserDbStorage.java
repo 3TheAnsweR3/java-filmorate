@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.storage;
 
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
@@ -14,6 +15,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +23,11 @@ import java.util.Map;
 @Repository
 public class UserDbStorage implements UserStorage {
     private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedJdbcTemplate;
 
     public UserDbStorage(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.namedJdbcTemplate = new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
     @Override
@@ -71,13 +75,12 @@ public class UserDbStorage implements UserStorage {
 
         String insertSql = "INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, ?)";
 
+        List<Object[]> rows = new ArrayList<>();
         for (Map.Entry<Long, FriendshipStatus> entry : user.getFriends().entrySet()) {
-            jdbcTemplate.update(
-                    insertSql,
-                    user.getId(),
-                    entry.getKey(),
-                    entry.getValue().name()
-            );
+            rows.add(new Object[]{user.getId(), entry.getKey(), entry.getValue().name()});
+        }
+        if (!rows.isEmpty()) {
+            jdbcTemplate.batchUpdate(insertSql, rows);
         }
 
         return user;
@@ -100,9 +103,22 @@ public class UserDbStorage implements UserStorage {
         String sql = "SELECT id, email, login, name, birthday FROM users ORDER BY id";
         List<User> users = jdbcTemplate.query(sql, this::mapRowToUser);
 
-        for (User user : users) {
-            user.setFriends(getFriends(user.getId()));
+        if (users.isEmpty()) {
+            return users;
         }
+
+        Map<Long, User> usersById = new HashMap<>();
+        for (User user : users) {
+            usersById.put(user.getId(), user);
+        }
+
+        String friendshipsSql = "SELECT user_id, friend_id, status FROM friendships WHERE user_id IN (:ids)";
+        namedJdbcTemplate.query(friendshipsSql, Map.of("ids", usersById.keySet()), resultSet -> {
+            User user = usersById.get(resultSet.getLong("user_id"));
+            long friendId = resultSet.getLong("friend_id");
+            FriendshipStatus status = FriendshipStatus.valueOf(resultSet.getString("status"));
+            user.getFriends().put(friendId, status);
+        });
 
         return users;
     }

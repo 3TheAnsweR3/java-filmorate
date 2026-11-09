@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
@@ -56,16 +57,16 @@ public class FilmService {
     }
 
     public void addLike(long filmId, long userId) {
-        filmStorage.getFilm(filmId);
-        userStorage.getUser(userId);
-        filmStorage.addLike(filmId, userId);
+        Film film = filmStorage.getFilm(filmId);
+        User user = userStorage.getUser(userId);
+        filmStorage.addLike(film, user);
         log.info("Пользователь с id={} добавил лайк фильму с id={}", userId, filmId);
     }
 
     public void removeLike(long filmId, long userId) {
-        filmStorage.getFilm(filmId);
-        userStorage.getUser(userId);
-        filmStorage.removeLike(filmId, userId);
+        Film film = filmStorage.getFilm(filmId);
+        User user = userStorage.getUser(userId);
+        filmStorage.removeLike(film, user);
         log.info("Пользователь с id={} удалил лайк у фильма с id={}", userId, filmId);
     }
 

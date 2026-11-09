@@ -301,16 +301,16 @@ public class FilmDbStorageTest {
         User firstUser = createUser("first");
         User secondUser = createUser("second");
 
-        filmStorage.addLike(film.getId(), firstUser.getId());
-        filmStorage.addLike(film.getId(), firstUser.getId());
-        filmStorage.addLike(film.getId(), secondUser.getId());
+        filmStorage.addLike(film, firstUser);
+        filmStorage.addLike(film, firstUser);
+        filmStorage.addLike(film, secondUser);
         assertEquals(Set.of(firstUser.getId(), secondUser.getId()), filmStorage.getFilm(film.getId()).getLikes());
 
         film.setLikes(Set.of());
         assertEquals(Set.of(firstUser.getId(), secondUser.getId()), filmStorage.updateFilm(film).getLikes());
 
-        filmStorage.removeLike(film.getId(), firstUser.getId());
-        filmStorage.removeLike(film.getId(), firstUser.getId());
+        filmStorage.removeLike(film, firstUser);
+        filmStorage.removeLike(film, firstUser);
         assertEquals(Set.of(secondUser.getId()), filmStorage.getAllFilms().getFirst().getLikes());
     }
 
@@ -330,10 +330,10 @@ public class FilmDbStorageTest {
 
         third.setGenres(List.of(genre(2)));
         filmStorage.updateFilm(third);
-        filmStorage.addLike(second.getId(), firstUser.getId());
-        filmStorage.addLike(third.getId(), firstUser.getId());
-        filmStorage.addLike(third.getId(), secondUser.getId());
-        filmStorage.addLike(fourth.getId(), secondUser.getId());
+        filmStorage.addLike(second, firstUser);
+        filmStorage.addLike(third, firstUser);
+        filmStorage.addLike(third, secondUser);
+        filmStorage.addLike(fourth, secondUser);
 
         List<Film> popular = filmStorage.getPopular(2);
         assertEquals(List.of(third.getId(), second.getId()), popular.stream().map(Film::getId).toList());
@@ -354,9 +354,9 @@ public class FilmDbStorageTest {
         User firstUser = createUser("first");
         User secondUser = createUser("second");
 
-        filmStorage.addLike(deleted.getId(), firstUser.getId());
-        filmStorage.addLike(remaining.getId(), firstUser.getId());
-        filmStorage.addLike(remaining.getId(), secondUser.getId());
+        filmStorage.addLike(deleted, firstUser);
+        filmStorage.addLike(remaining, firstUser);
+        filmStorage.addLike(remaining, secondUser);
 
         filmStorage.deleteFilm(deleted.getId());
         assertThrows(NotFoundException.class, () -> filmStorage.getFilm(deleted.getId()));

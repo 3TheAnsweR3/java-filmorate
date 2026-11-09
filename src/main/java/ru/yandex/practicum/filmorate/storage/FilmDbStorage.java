@@ -13,6 +13,7 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.User;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -139,14 +140,15 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     @Override
-    public void addLike(long filmId, long userId) {
+    public void addLike(Film film, User user) {
         String sql = "MERGE INTO likes (film_id, user_id) KEY (film_id, user_id) VALUES (?, ?)";
-        jdbcTemplate.update(sql, filmId, userId);
+        jdbcTemplate.update(sql, film.getId(), user.getId());
     }
 
     @Override
-    public void removeLike(long filmId, long userId) {
-        jdbcTemplate.update("DELETE FROM likes WHERE film_id = ? AND user_id = ?", filmId, userId);
+    public void removeLike(Film film, User user) {
+        jdbcTemplate.update("DELETE FROM likes WHERE film_id = ? AND user_id = ?",
+                film.getId(), user.getId());
     }
 
     @Override
