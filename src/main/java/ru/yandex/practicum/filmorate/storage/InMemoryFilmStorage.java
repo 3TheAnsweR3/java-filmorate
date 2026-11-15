@@ -4,8 +4,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.User;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,24 @@ public class InMemoryFilmStorage implements FilmStorage {
         checkFilmExists(id);
         films.remove(id);
         log.info("Удалён фильм с id={}", id);
+    }
+
+    @Override
+    public void addLike(Film film, User user) {
+        getFilm(film.getId()).getLikes().add(user.getId());
+    }
+
+    @Override
+    public void removeLike(Film film, User user) {
+        getFilm(film.getId()).getLikes().remove(user.getId());
+    }
+
+    @Override
+    public List<Film> getPopular(int count) {
+        return getAllFilms().stream()
+                .sorted(Comparator.comparingInt((Film film) -> film.getLikes().size()).reversed())
+                .limit(count)
+                .toList();
     }
 
     private void checkFilmExists(long id) {
